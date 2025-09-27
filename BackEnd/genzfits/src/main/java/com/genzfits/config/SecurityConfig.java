@@ -6,16 +6,21 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 public class SecurityConfig {
 
-    // Permit all requests during development. Lock this down in production!
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .csrf().disable()
-            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+            .sessionManagement(session -> session
+                .maximumSessions(1)
+                .maxSessionsPreventsLogin(false)
+            );
+        
         return http.build();
     }
 

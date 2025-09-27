@@ -1,3 +1,4 @@
+// src/main/java/com/genzfits/model/User.java
 package com.genzfits.model;
 
 import jakarta.persistence.*;

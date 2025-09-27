@@ -1,3 +1,4 @@
+// src/main/java/com/genzfits/model/Order.java
 package com.genzfits.model;
 
 import jakarta.persistence.*;

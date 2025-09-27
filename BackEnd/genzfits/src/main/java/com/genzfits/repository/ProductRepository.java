@@ -1,3 +1,4 @@
+// src/main/java/com/genzfits/repository/ProductRepository.java
 package com.genzfits.repository;
 
 import com.genzfits.model.Product;

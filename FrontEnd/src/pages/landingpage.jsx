@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";   // ✅ Added
+import { useNavigate } from "react-router-dom";
 import "../pages_css/landingpage.css";
 import GenZFits from "../assets/GenZFits_logo.png";
 import tshirtImg from "../assets/t-shirts.jpg";
 import { 
   FaUser, FaShoppingCart, FaSearch, FaBars, FaTimes, 
   FaHome, FaInfoCircle, FaEnvelope, FaInstagram, 
-  FaTwitter, FaFacebookF, FaUserCircle 
+  FaTwitter, FaFacebookF, FaUserCircle, FaEye, FaEyeSlash,
+  FaHeart
 } from "react-icons/fa";
 
 const LandingPage = () => {
@@ -23,6 +24,7 @@ const LandingPage = () => {
     password: "",
     verificationCode: "",
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [generatedCode, setGeneratedCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [codeVerified, setCodeVerified] = useState(false);
@@ -31,17 +33,69 @@ const LandingPage = () => {
     identifier: "",
     password: "",
   });
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [categoryProducts, setCategoryProducts] = useState({});
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const navigate = useNavigate();   // ✅ Added
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const userData = localStorage.getItem("user");
-    if (userData) {
-      setUserLoggedIn(true);
-      const parsed = JSON.parse(userData);
-      setCurrentUser(parsed);
-    }
+    checkSession();
+    fetchCategoryProducts();
+    fetchFeaturedProducts();
+    
+    // Set up session check every minute
+    const interval = setInterval(checkSession, 60000);
+    return () => clearInterval(interval);
   }, []);
+
+  const checkSession = async () => {
+    try {
+      const response = await axios.get("http://localhost:8085/api/users/check-session", {
+        withCredentials: true
+      });
+      if (response.data.status === "active") {
+        setUserLoggedIn(true);
+        setCurrentUser(response.data.user);
+        localStorage.setItem("user", JSON.stringify(response.data.user));
+      } else {
+        setUserLoggedIn(false);
+        setCurrentUser(null);
+        localStorage.removeItem("user");
+      }
+    } catch (error) {
+      setUserLoggedIn(false);
+      setCurrentUser(null);
+      localStorage.removeItem("user");
+    }
+  };
+
+  const fetchCategoryProducts = async () => {
+    try {
+      const categories = ["T-Shirts", "Shirts", "Hoodies", "Formals", "Casuals", "Party Wear", "Trending"];
+      const productsByCategory = {};
+      
+      for (const category of categories) {
+        const res = await axios.get(`http://localhost:8085/api/admin/products/category/${category}`);
+        productsByCategory[category] = res.data;
+      }
+      
+      setCategoryProducts(productsByCategory);
+    } catch (error) {
+      console.error("Error fetching category products:", error);
+    }
+  };
+
+  const fetchFeaturedProducts = async () => {
+    try {
+      const res = await axios.get("http://localhost:8085/api/admin/products");
+      const shuffled = res.data.sort(() => 0.5 - Math.random());
+      setFeaturedProducts(shuffled.slice(0, 3));
+    } catch (error) {
+      console.error("Error fetching featured products:", error);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -97,10 +151,15 @@ const LandingPage = () => {
         username: formData.username,
         mobile: formData.mobile,
         password: formData.password,
-      });
+      }, { withCredentials: true });
+      
       if (res.data.status === "success") {
         alert(res.data.message);
-        setIsLogin(true);
+        setUserLoggedIn(true);
+        setCurrentUser(res.data.data);
+        setModalOpen(false);
+        localStorage.setItem("user", JSON.stringify(res.data.data));
+        
         setFormData({
           fullName: "",
           username: "",
@@ -130,7 +189,8 @@ const LandingPage = () => {
       const res = await axios.post("http://localhost:8085/api/users/login", {
         identifier: loginData.identifier,
         password: loginData.password
-      });
+      }, { withCredentials: true });
+      
       if (res.data.status === "success") {
         alert("Login successful!");
         setUserLoggedIn(true);
@@ -138,13 +198,9 @@ const LandingPage = () => {
         setModalOpen(false);
         localStorage.setItem("user", JSON.stringify(res.data.data));
 
-        // ✅ Redirect logic
         if (res.data.data.isAdmin) {
-          navigate("/adminpage");   // Admins → Admin page
-        } else {
-          navigate("/"); // Normal users → Landing page
+          navigate("/adminpage");
         }
-
       } else {
         alert(res.data.message);
       }
@@ -154,27 +210,55 @@ const LandingPage = () => {
     }
   };
 
-  const handleLogout = () => {
-    setUserLoggedIn(false);
-    setCurrentUser(null);
-    localStorage.removeItem("user");
-    alert("Logged out successfully!");
-    navigate("/landingpage");   // ✅ Ensure logout returns to landing
+  const handleLogout = async () => {
+    try {
+      await axios.post("http://localhost:8085/api/users/logout", {}, { withCredentials: true });
+      setUserLoggedIn(false);
+      setCurrentUser(null);
+      localStorage.removeItem("user");
+      alert("Logged out successfully!");
+      navigate("/");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
+  const handleCategoryClick = (category) => {
+    navigate(`/products?category=${encodeURIComponent(category)}`);
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    navigate(`/products?search=${searchQuery}`);
+  };
+
+  const handleBuyNow = () => {
+    if (!userLoggedIn) {
+      setModalOpen(true);
+      setIsLogin(true);
+    } else {
+      navigate("/checkout");
+    }
   };
 
   return (
     <div className="landing-page">
       {/* Header */}
       <header className="header">
-        <div className="logo">
+        <div className="logo" onClick={() => navigate("/")}>
           <img src={GenZFits} alt="Logo" />
         </div>
-        <div className="search-bar">
-          <input type="text" placeholder="Search products..." />
-          <button className="search-btn">
+        <form className="search-bar" onSubmit={handleSearch}>
+          <input 
+            type="text" 
+            placeholder="Search products..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <button type="submit" className="search-btn">
             <FaSearch />
           </button>
-        </div>
+        </form>
         <div className="icons">
           {userLoggedIn ? (
             <div className="user-menu">
@@ -192,9 +276,13 @@ const LandingPage = () => {
               <span>Login</span>
             </button>
           )}
+          <button className="icon-btn" onClick={() => navigate("/wishlist")}>
+            <FaHeart />
+            {/* <span>Wishlist</span> */}
+          </button>
           <button className="icon-btn">
             <FaShoppingCart />
-            <span>Cart</span>
+            {/* <span>Cart</span> */}
           </button>
           <button className="icon-btn sidebar-toggle" onClick={() => setSidebarOpen(true)}>
             <FaBars />
@@ -235,8 +323,22 @@ const LandingPage = () => {
                 <div className="form-group">
                   <input type="text" name="identifier" placeholder="Username or Mobile Number" value={loginData.identifier} onChange={handleLoginChange} required />
                 </div>
-                <div className="form-group">
-                  <input type="password" name="password" placeholder="Password" value={loginData.password} onChange={handleLoginChange} required />
+                <div className="form-group password-input">
+                  <input 
+                    type={showLoginPassword ? "text" : "password"} 
+                    name="password" 
+                    placeholder="Password" 
+                    value={loginData.password} 
+                    onChange={handleLoginChange} 
+                    required 
+                  />
+                  <button 
+                    type="button" 
+                    className="password-toggle"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                  >
+                    {showLoginPassword ? <FaEyeSlash /> : <FaEye />}
+                  </button>
                 </div>
                 <button type="submit" className="auth-btn">Login</button>
                 <p className="auth-switch">Don't have an account? <span onClick={() => setIsLogin(false)}>Sign Up</span></p>
@@ -250,8 +352,22 @@ const LandingPage = () => {
                 <div className="form-group">
                   <input type="text" name="username" placeholder="Username" value={formData.username} onChange={handleInputChange} required />
                 </div>
-                <div className="form-group">
-                  <input type="password" name="password" placeholder="Password" value={formData.password} onChange={handleInputChange} required />
+                <div className="form-group password-input">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    name="password" 
+                    placeholder="Password" 
+                    value={formData.password} 
+                    onChange={handleInputChange} 
+                    required 
+                  />
+                  <button 
+                    type="button" 
+                    className="password-toggle"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <FaEyeSlash /> : <FaEye />}
+                  </button>
                 </div>
                 <div className="form-group">
                   <input type="text" name="mobile" placeholder="Mobile Number" value={formData.mobile} onChange={handleInputChange} required maxLength="10" />
@@ -272,31 +388,41 @@ const LandingPage = () => {
         </div>
       )}
 
-      {/* Category bar, hero, featured products, newsletter, footer (unchanged content) */}
+      {/* Category bar */}
       <div className="category-bar">
-        <div className="category-item"><img src={tshirtImg} alt="Fashion" /><span>T-Shirts</span></div>
-        <div className="category-item"><img src={tshirtImg} alt="Shirts" /><span>Shirts</span></div>
-        <div className="category-item"><img src={tshirtImg} alt="Hoodies" /><span>Hoodies</span></div>
-        <div className="category-item"><img src={tshirtImg} alt="Formals" /><span>Formals</span></div>
-        <div className="category-item"><img src={tshirtImg} alt="Casuals" /><span>Casuals</span></div>
-        <div className="category-item"><img src={tshirtImg} alt="Party Wear" /><span>Party Wear</span></div>
-        <div className="category-item"><img src={tshirtImg} alt="Trending" /><span>Trending</span></div>
+        {["T-Shirts", "Shirts", "Hoodies", "Formals", "Casuals", "Party Wear", "Trending"].map(category => (
+          <div key={category} className="category-item" onClick={() => handleCategoryClick(category)}>
+            <img src={tshirtImg} alt={category} />
+            <span>{category} ({categoryProducts[category] ? categoryProducts[category].length : 0})</span>
+          </div>
+        ))}
       </div>
 
       <section className="hero">
         <div className="hero-content">
           <h1>Elevate Your Style</h1>
           <p>Discover the latest trends in fashion with GenZfits</p>
-          <button className="cta-button">Shop Now</button>
+          <button className="cta-button" onClick={() => navigate("/products")}>Shop Now</button>
+          <button className="cta-button secondary" onClick={handleBuyNow}>Buy Now</button>
         </div>
       </section>
 
       <section className="featured-products">
         <h2>Top Rated For You</h2>
         <div className="products-grid">
-          <div className="product-card"><div className="product-image"></div><h3>Urban Jacket</h3><p>$89.99</p></div>
-          <div className="product-card"><div className="product-image"></div><h3>Streetwear Hoodie</h3><p>$59.99</p></div>
-          <div className="product-card"><div className="product-image"></div><h3>Casual Sneakers</h3><p>$79.99</p></div>
+          {featuredProducts.map(product => (
+            <div key={product.id} className="product-card" onClick={() => navigate(`/product/${product.id}`)}>
+              <div className="product-image">
+                {product.images && product.images.length > 0 ? (
+                  <img src={`http://localhost:8085${product.images[0]}`} alt={product.name} loading="lazy" onError={(e) => { e.target.src = 'https://via.placeholder.com/300x400/CCCCCC/FFFFFF?text=No+Image'; }} />
+                ) : (
+                  <div className="placeholder-image"></div>
+                )}
+              </div>
+              <h3>{product.name}</h3>
+              <p>₹{product.price}</p>
+            </div>
+          ))}
         </div>
       </section>
 

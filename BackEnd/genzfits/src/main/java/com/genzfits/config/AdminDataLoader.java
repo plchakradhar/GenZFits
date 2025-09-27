@@ -18,7 +18,6 @@ public class AdminDataLoader implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // Create admin if not exists
         if (userRepository.findByUsername("admin").isEmpty()) {
             User adminUser = new User();
             adminUser.setFullName("Administrator");
